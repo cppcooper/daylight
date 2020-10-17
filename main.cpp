@@ -7,21 +7,6 @@
 #include <math.h>
 #include "/data/dev/libraries/cxx/CLI11.hpp"
 
-struct delimiter_ctype : std::ctype<char> {
-  static const mask* make_table(std::string delims)
-  {
-    // make a copy of the "C" locale table
-    static std::vector<mask> v(classic_table(), classic_table() + table_size);
-    for(mask m : v){
-      m &= ~space;
-    }
-    for(char d : delims){
-      v[d] |= space;
-    }
-    return &v[0];
-  }
-  delimiter_ctype(std::string delims, ::size_t refs = 0) : ctype(make_table(delims), false, refs) {}
-};
 
 struct timed{
   double real;
@@ -79,8 +64,8 @@ double declinationAngle(int n){
   return asin(sin(-axialTilt)*cos(t1+t3));
 }
 
-double sunrise(int n, double elevation, double latitude){
-  return 0;
+double sunrise(double declination, double elevation, double latitude){
+  return acos(-tan(deg2rad*latitude)*tan(deg2rad*declination))*rotPerHour;
 }
 
 double hoursOfDaylight(double declination, double elevation, double latitude){
@@ -110,5 +95,6 @@ int main(int argc, char *argv[]) {
   else
     std::cout << "delta: " << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
   std::cout << " minutes" << std::endl;
+  //std::cout << "sunrise: " << sunrise(declinationAngle(day),elevation,latitude) << std::endl;
   //std::cout << hoursOfDaylight(day+1,49.88) << std::endl;
 }
