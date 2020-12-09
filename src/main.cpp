@@ -110,6 +110,67 @@ const double hack_value = 0.005109; //tweakin it to get the correct declination 
 /*solar declination: the largest errors in this equation are less than ± 0.2°, but are less than ± 0.03° for a given year if the number 10 is adjusted up or down in fractional days as determined by how far the previous year's December solstice occurred before or after noon on December 22.
 */
 
+double convert_dynamical_time_to_day(double val, bool isleap);
+double winter_solstice_offset(){ // for the current solar year
+    double m;
+    double last_year = Year() - 1;
+    m = (last_year - 2000) / 1000;
+    // Astronomical Algorithms pg 178
+    double last_ws_time = 2451900.05952 + 365242.74049 * m - 0.06223 * pow(m,2) - 0.00823 * pow(m,3) + 0.00032 * pow(m,4);
+    return convert_dynamical_time_to_day(last_ws_time,is_leap_year(last_year)) - 356;
+}
+
+double declination_angle(int day_of_year){
+    const double e = 0.0167; //eccentricity of earth's orbit
+    const double wso = winter_solstice_offset();
+    const double dtp = 2;// + wso; //days from new year to perihelion
+    const double dtws = 10 + wso; //days from last year's winter solstice to this year's beginning
+                                                                                            // (ie. jan 1 [ie. day 0])
+    double t1 = rotPerDay * (day_of_year + dtws);
+    double t2 = (M_PI * e) * sin(rotPerDay * (day_of_year - dtp));
+    double declination = -asin(sin(-axialTilt)*cos(t1+t2));
+    //std::cout << asin(sin(-axialTilt)*cos(t1+t3)) << " - complex calc" << std::endl;
+    //std::cout << axialTilt*sin(2*M_PI*((284+n)/yearLength)) << " - simplest calc" << std::endl;
+    std::cout << rad2deg*declination << std::endl;
+    return declination;
+}
+
+double sunrise(double declination, double elevation, double latitude){
+    return acos(-tan(deg2rad*latitude)*tan(deg2rad*declination))*rotPerHour;
+}
+
+double day_length(double declination, double elevation, double latitude){
+    double &d = declination;
+    double top = sin(deg2rad*(-0.83-2.076*sqrt(elevation)/60))-(sin(deg2rad*latitude)*sin(d));
+    double bot = cos(deg2rad*latitude)*cos(d);
+    double w = acos(top/bot);
+    return w*rotPerHour;
+}
+
+int main(int argc, char *argv[]) {
+    double elevation = 0.0;
+    double latitude = 1.0;
+    int day = DayOfYear();
+    CLI::App app;
+    app.add_option("--day,-d",day,"specify day N of solar year");
+    app.add_option("--elevation,-e",elevation,"specify the elevation of the observer(metres)");
+    app.add_option("--latitude,-l",latitude,"specify the latitude of the observer(degrees)");
+    CLI11_PARSE(app,argc,argv);
+    int yesterday = day - 1;
+    timed a(day_length(declination_angle(day), elevation, latitude));
+    std::cout << a.hours << ":" << (a.minutes < 10 ? "0" : "") << a.minutes << " hours on day " << day << std::endl;
+    timed b(day_length(declination_angle(day - 1), elevation, latitude));
+    auto c = a-b;
+    if (c.real < 0) {
+        std::cout << "delta: -" << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
+    } else {
+        std::cout << "delta: " << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
+    }
+    std::cout << " minutes" << std::endl;
+    //std::cout << "sunrise: " << sunrise(declination_angle(day),elevation,latitude) << std::endl;
+    //std::cout << day_length(day+1,49.88) << std::endl;
+}
+
 #ifdef PAPAL                    // Pope Gregory XIII's decree
 #define LASTJULDATE 15821004L   // last day to use Julian calendar
 #define LASTJULJDN  2299160L    // jdn of same
@@ -118,8 +179,16 @@ const double hack_value = 0.005109; //tweakin it to get the correct declination 
 #define LASTJULJDN  2361221L    // jdn of same
 #endif
 
-double convert_dynamical_time_to_day(double val, bool isleap)
-{
+double convert_dynamical_time_to_day(double val, bool isleap){
+    // This programme uses formulae taken from
+    // Jean Meeus's "Astronomical Algorithms" (1991).
+    // CalculateDate() function based on formulae originally posted by
+    // Tom Van Flandern / Washington, DC / metares@well.sf.ca.us
+    // in the UseNet newsgroup sci.astro.
+    // Reposted 14 May 1991 in FidoNet C Echo conference by
+    // Paul Schlyter (Stockholm)
+    // Minor corrections by
+    // Raymond Gardner Englewood, Colorado
     double ut ;
     int jdn ;
     int month, day, hour, minute ;
@@ -157,63 +226,4 @@ double convert_dynamical_time_to_day(double val, bool isleap)
 
     double ret_day = day + (hour/24.f) + (minute / (24.f*60.f));
     return ret_day + get_cumulative_days(month,isleap);
-}
-
-double winterSolsticeVariance(){ // for the current solar year
-    double m;
-    double last_year = Year() - 1;
-    m = (last_year - 2000) / 1000;
-    // Astronomical Algorithms pg 178
-    double last_ws_time = 2451900.05952 + 365242.74049 * m - 0.06223 * pow(m,2) - 0.00823 * pow(m,3) + 0.00032 * pow(m,4);
-    return 356 - convert_dynamical_time_to_day(last_ws_time,is_leap_year(last_year));
-}
-
-double declinationAngle(int day_of_year){
-    //std::cout << "july 28, solar declination 18.66 degrees,\n" << 18.66*deg2rad << " in radians" << std::endl;
-    const double eccentricity = 0.0167;
-    const double wsv_lastyear = winterSolsticeVariance();
-    const double days_from_ws_to_nearyear = 10 + wsv_lastyear; //jan 1 = day 0
-    const double days_to_perihelion = 2;
-    double t1 = rotPerDay * (day_of_year + days_from_ws_to_nearyear);
-    double t2 = (M_PI * eccentricity) * sin(rotPerDay * (day_of_year - 2));
-    double declination = -asin(sin(-axialTilt)*cos(t1+t2));
-    //std::cout << asin(sin(-axialTilt)*cos(t1+t3)) << " - complex calc" << std::endl;
-    //std::cout << axialTilt*sin(2*M_PI*((284+n)/yearLength)) << " - simplest calc" << std::endl;
-    //std::cout << declination << std::endl;
-    return declination;
-}
-
-double sunrise(double declination, double elevation, double latitude){
-    return acos(-tan(deg2rad*latitude)*tan(deg2rad*declination))*rotPerHour;
-}
-
-double hoursOfDaylight(double declination, double elevation, double latitude){
-    double &d = declination;
-    double top = sin(deg2rad*(-0.83-2.076*sqrt(elevation)/60))-(sin(deg2rad*latitude)*sin(d));
-    double bot = cos(deg2rad*latitude)*cos(d);
-    double w = acos(top/bot);
-    return w*rotPerHour;
-}
-
-int main(int argc, char *argv[]) {
-    double elevation = 0.0;
-    double latitude = 1.0;
-    int day = DayOfYear();
-    CLI::App app;
-    app.add_option("--day,-d",day,"specify day N of solar year");
-    app.add_option("--elevation,-e",elevation,"specify the elevation of the observer(metres)");
-    app.add_option("--latitude,-l",latitude,"specify the latitude of the observer(degrees)");
-    CLI11_PARSE(app,argc,argv);
-    int yesterday = day - 1;
-    timed a(hoursOfDaylight(declinationAngle(day),elevation,latitude));
-    std::cout << a.hours << ":" << (a.minutes < 10 ? "0" : "") << a.minutes << " hours on day " << day << std::endl;
-    timed b(hoursOfDaylight(declinationAngle(day-1),elevation,latitude));
-    auto c = a-b;
-    if (c.real < 0)
-    std::cout << "delta: -" << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
-    else
-    std::cout << "delta: " << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
-    std::cout << " minutes" << std::endl;
-    //std::cout << "sunrise: " << sunrise(declinationAngle(day),elevation,latitude) << std::endl;
-    //std::cout << hoursOfDaylight(day+1,49.88) << std::endl;
 }
