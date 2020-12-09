@@ -176,10 +176,10 @@ double declinationAngle(int day_of_year){
     const double days_to_perihelion = 2;
     double t1 = rotPerDay * (day_of_year + days_from_ws_to_nearyear);
     double t2 = (M_PI * eccentricity) * sin(rotPerDay * (day_of_year - 2));
-    double declination = asin(sin(-axialTilt)*cos(t1+t2));
+    double declination = -asin(sin(-axialTilt)*cos(t1+t2));
     //std::cout << asin(sin(-axialTilt)*cos(t1+t3)) << " - complex calc" << std::endl;
     //std::cout << axialTilt*sin(2*M_PI*((284+n)/yearLength)) << " - simplest calc" << std::endl;
-    std::cout << declination << std::endl;
+    //std::cout << declination << std::endl;
     return declination;
 }
 
