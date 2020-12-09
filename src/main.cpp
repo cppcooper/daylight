@@ -4,6 +4,7 @@
  * for now they are lost to the sands of time [read: my browser history]
  * https://www.codeguru.com/cpp/cpp/date_time/article.php/c4763/Equinox-and-Solstice-Calculation.htm
  * https://stellafane.org/misc/equinox.html
+ * http://www.jgiesen.de/kepler/eccentricity.html
  * Astronomical Algorithms Second Edition by Jean Meeus, ©1998, published by Willmann-Bell
  */
 #include <iostream>
@@ -39,7 +40,7 @@ int Year(){
     time_t t;
     time(&t);
     tm* ti=localtime(&t);
-    return ti->tm_year;
+    return 1900 + ti->tm_year;
 }
 
 int DayOfYear(){
@@ -102,7 +103,6 @@ int get_cumulative_days(int month, bool isleap = false){
 const double deg2rad = 2*M_PI/360; //conversion
 const double rad2deg = 180/M_PI;   //conversion
 const double yearLength = 365.24;
-const double axialTilt = -23.44*deg2rad; //earth tilt
 const double rotPerHour = (24/M_PI); //earth spin
 const double rotPerDay = (2*M_PI)/yearLength; //solar angular velocity
 const double original_value = 0.0167;
@@ -120,18 +120,20 @@ double winter_solstice_offset(){ // for the current solar year
     return convert_dynamical_time_to_day(last_ws_time,is_leap_year(last_year)) - 356;
 }
 
+double eccentricity(int year);
 double declination_angle(int day_of_year){
-    const double e = 0.0167; //eccentricity of earth's orbit
+    const double e = eccentricity(Year()); //eccentricity of earth's orbit
+    const double axialTilt = -23.44*deg2rad; //earth's axial tilt. 23.44 is not correct but it is close, couldn't find a calculation
     const double wso = winter_solstice_offset();
-    const double dtp = 2;// + wso; //days from new year to perihelion
+    const double dtp = 3.5;//days from new year to perihelion (jan 2-5, we'll take the average 3.5)
     const double dtws = 10 + wso; //days from last year's winter solstice to this year's beginning
                                                                                             // (ie. jan 1 [ie. day 0])
-    double t1 = rotPerDay * (day_of_year + dtws);
-    double t2 = (M_PI * e) * sin(rotPerDay * (day_of_year - dtp));
+    double t1 = rotPerDay * (day_of_year + dtws); //term 1
+    double t2 = (M_PI * e) * sin(rotPerDay * (day_of_year - dtp)); //term 2
     double declination = -asin(sin(-axialTilt)*cos(t1+t2));
     //std::cout << asin(sin(-axialTilt)*cos(t1+t3)) << " - complex calc" << std::endl;
     //std::cout << axialTilt*sin(2*M_PI*((284+n)/yearLength)) << " - simplest calc" << std::endl;
-    std::cout << rad2deg*declination << std::endl;
+    //std::cout << rad2deg*declination << std::endl;
     return declination;
 }
 
@@ -171,24 +173,20 @@ int main(int argc, char *argv[]) {
     //std::cout << day_length(day+1,49.88) << std::endl;
 }
 
-#ifdef PAPAL                    // Pope Gregory XIII's decree
-#define LASTJULDATE 15821004L   // last day to use Julian calendar
-#define LASTJULJDN  2299160L    // jdn of same
-#else                           // British-American usage
-#define LASTJULDATE 17520902L   // last day to use Julian calendar
+
+// This programme uses formulae taken from
+// Jean Meeus's "Astronomical Algorithms" (1991).
+// CalculateDate() function based on formulae originally posted by
+// Tom Van Flandern / Washington, DC / metares@well.sf.ca.us
+// in the UseNet newsgroup sci.astro.
+// Reposted 14 May 1991 in FidoNet C Echo conference by
+// Paul Schlyter (Stockholm)
+// Minor corrections by
+// Raymond Gardner Englewood, Colorado
+/// Removed other macros, this is the only one being used
 #define LASTJULJDN  2361221L    // jdn of same
-#endif
 
 double convert_dynamical_time_to_day(double val, bool isleap){
-    // This programme uses formulae taken from
-    // Jean Meeus's "Astronomical Algorithms" (1991).
-    // CalculateDate() function based on formulae originally posted by
-    // Tom Van Flandern / Washington, DC / metares@well.sf.ca.us
-    // in the UseNet newsgroup sci.astro.
-    // Reposted 14 May 1991 in FidoNet C Echo conference by
-    // Paul Schlyter (Stockholm)
-    // Minor corrections by
-    // Raymond Gardner Englewood, Colorado
     double ut ;
     int jdn ;
     int month, day, hour, minute ;
@@ -226,4 +224,37 @@ double convert_dynamical_time_to_day(double val, bool isleap){
 
     double ret_day = day + (hour/24.f) + (minute / (24.f*60.f));
     return ret_day + get_cumulative_days(month,isleap);
+}
+
+// (c) 2006 J. Giesen
+//2006, Mar 21
+//original javascript source available here: http://www.jgiesen.de/kepler/eccentricity.html
+//"According to Meeus (More Mathematical Astronomy Morsels, Chapter 33) Simon et al. published in 1994 an expression for the eccentricity e:"
+//e = 0.0167086342-0.0004203654*T-0.0000126734*T^2+0.0000001444*T^3-0.0000000002*T^4+0.0000000003*T^5
+
+double JulD(int YY) {
+    double MM=1;
+    double DD=1;
+    double HR=12;
+    double MN=0;
+    double SC=0;
+    HR = HR + (MN/60) + (SC/3600);
+    double GGG = 1;
+    if (YY<=1585) GGG=0;
+    double JD = -1*floor(7*(floor((MM+9)/12)+YY)/4);
+    double S = 1;
+    if ((MM-9)<0) S=-1;
+    double A = abs(MM-9);
+    double J1 = floor(YY + S*floor(A/7));
+    J1 = -1*floor((floor(J1/100)+1)*3/4);
+    JD = JD + floor(275*MM/9) + DD + (GGG*J1);
+    JD = JD + 1721027 + 2*GGG + 367 * YY - 0.5;
+    JD = JD + (HR/24);
+    return JD;
+}
+
+double eccentricity(int Y) {
+    double jd=JulD(Y);
+    double T=(jd-2451545)/365250.0;
+    return 0.0167086342-0.0004203654*T-0.0000126734*pow(T,2)+0.0000001444*pow(T,3)-0.0000000002*pow(T,4)+0.0000000003*pow(T,5);
 }
