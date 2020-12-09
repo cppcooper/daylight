@@ -1,0 +1,4 @@
+*.zip
+cmake-build-debug/
+Seasons/
+.idea/
