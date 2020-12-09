@@ -2,11 +2,11 @@
  * These calculations are scrounged together from wiki articles and other source code
  * I will probably try to find the source material to include at a later date,
  * for now they are lost to the sands of time [read: my browser history]
+ * https://www.codeguru.com/cpp/cpp/date_time/article.php/c4763/Equinox-and-Solstice-Calculation.htm
+ * https://stellafane.org/misc/equinox.html
+ * Astronomical Algorithms Second Edition by Jean Meeus, ©1998, published by Willmann-Bell
  */
 #include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
 #include <ctime>
 #include <cmath>
 #include "/data/dev/libraries/cxx/CLI11.hpp"
@@ -49,18 +49,66 @@ int DayOfYear(){
     return ti->tm_yday;
 }
 
+bool is_leap_year(int year){
+    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+}
+
+int get_cumulative_days(int month, bool isleap = false){
+    int days = 0;
+    //We are adding up previous months
+    //Therefore subtract one
+    switch(month-1){
+        case 1: //January
+            return 31;
+        case 2: //February
+            days = isleap ? 29 : 28;
+            break;
+        case 3: //March
+            days = 31;
+            break;
+        case 4: //April
+            days = 30;
+            break;
+        case 5: //May
+            days = 31;
+            break;
+        case 6: //June
+            days = 30;
+            break;
+        case 7: //July
+            days = 31;
+            break;
+        case 8: //August
+            days = 31;
+            break;
+        case 9: //September
+            days = 30;
+            break;
+        case 10: //October
+            days = 31;
+            break;
+        case 11: //November
+            days = 30;
+            break;
+        case 12: //December
+            days = 31;
+            break;
+        default:
+            return 0;
+    }
+    return days + get_cumulative_days(month-1, isleap);
+}
+
 const double deg2rad = 2*M_PI/360; //conversion
 const double rad2deg = 180/M_PI;   //conversion
 const double yearLength = 365.24;
-const double axialTilt = 23.44*deg2rad; //earth tilt
+const double axialTilt = -23.44*deg2rad; //earth tilt
 const double rotPerHour = (24/M_PI); //earth spin
 const double rotPerDay = (2*M_PI)/yearLength; //solar angular velocity
 const double original_value = 0.0167;
 const double hack_value = 0.005109; //tweakin it to get the correct declination value
 /*solar declination: the largest errors in this equation are less than ± 0.2°, but are less than ± 0.03° for a given year if the number 10 is adjusted up or down in fractional days as determined by how far the previous year's December solstice occurred before or after noon on December 22.
 */
-
-#define PAPAL
 
 #ifdef PAPAL                    // Pope Gregory XIII's decree
 #define LASTJULDATE 15821004L   // last day to use Julian calendar
@@ -70,12 +118,11 @@ const double hack_value = 0.005109; //tweakin it to get the correct declination 
 #define LASTJULJDN  2361221L    // jdn of same
 #endif
 
-double convert_dynamical_time(double val)
+double convert_dynamical_time_to_day(double val, bool isleap)
 {
     double ut ;
     int jdn ;
-    int year, month, day ;
-    int hour, minute ;
+    int month, day, hour, minute ;
     bool julian ;
     long x, z, m, d, y ;
     long daysPer400Years = 146097L ;
@@ -102,36 +149,38 @@ double convert_dynamical_time(double val)
     d = x - 2447 * m / 80 ;
     x = m / 11 ;
     m = m + 2 - 12 * x ;
-    y = 100 * (z - 49) + y + x ;
-    year = (int)y ;
     month = (int)m ;
     day = (int)d ;
-    if (year <= 0)                   // adjust BC years
-        year-- ;
 
     hour = (int)(ut * 24) ;
     minute = (int)((ut * 24 - hour) * 60) ;  //  Accurate to about 15 minutes c. 2000 CE.
 
-    return 0.0;
+    double ret_day = day + (hour/24.f) + (minute / (24.f*60.f));
+    return ret_day + get_cumulative_days(month,isleap);
 }
-
 
 double winterSolsticeVariance(){ // for the current solar year
     double m;
-    m = ((double)Year() - 2000.) / 1000. ;
-    double ws_time = 2451900.05952 + 365242.74049 * m - 0.06223 * m * m - 0.00823 * m * m * m + 0.00032 * m * m * m * m ;
-    return convert_dynamical_time(ws_time);
+    double last_year = Year() - 1;
+    m = (last_year - 2000) / 1000;
+    // Astronomical Algorithms pg 178
+    double last_ws_time = 2451900.05952 + 365242.74049 * m - 0.06223 * pow(m,2) - 0.00823 * pow(m,3) + 0.00032 * pow(m,4);
+    return 356 - convert_dynamical_time_to_day(last_ws_time,is_leap_year(last_year));
 }
 
-double declinationAngle(int n){
+double declinationAngle(int day_of_year){
     //std::cout << "july 28, solar declination 18.66 degrees,\n" << 18.66*deg2rad << " in radians" << std::endl;
-    double t0 = winterSolsticeVariance();
-    double t1 = rotPerDay*(n+t0+10);
-    double t2 = rotPerDay*(n+t0-2);
-    double t3 = M_PI*hack_value*sin(t2);
+    const double eccentricity = 0.0167;
+    const double wsv_lastyear = winterSolsticeVariance();
+    const double days_from_ws_to_nearyear = 10 + wsv_lastyear; //jan 1 = day 0
+    const double days_to_perihelion = 2;
+    double t1 = rotPerDay * (day_of_year + days_from_ws_to_nearyear);
+    double t2 = (M_PI * eccentricity) * sin(rotPerDay * (day_of_year - 2));
+    double declination = asin(sin(-axialTilt)*cos(t1+t2));
     //std::cout << asin(sin(-axialTilt)*cos(t1+t3)) << " - complex calc" << std::endl;
     //std::cout << axialTilt*sin(2*M_PI*((284+n)/yearLength)) << " - simplest calc" << std::endl;
-    return asin(sin(-axialTilt)*cos(t1+t3));
+    std::cout << declination << std::endl;
+    return declination;
 }
 
 double sunrise(double declination, double elevation, double latitude){
@@ -147,10 +196,10 @@ double hoursOfDaylight(double declination, double elevation, double latitude){
 }
 
 int main(int argc, char *argv[]) {
-    CLI::App app;
-    int day = DayOfYear();
     double elevation = 0.0;
     double latitude = 1.0;
+    int day = DayOfYear();
+    CLI::App app;
     app.add_option("--day,-d",day,"specify day N of solar year");
     app.add_option("--elevation,-e",elevation,"specify the elevation of the observer(metres)");
     app.add_option("--latitude,-l",latitude,"specify the latitude of the observer(degrees)");
