@@ -137,12 +137,24 @@ double declination_angle(int day_of_year){
     return declination;
 }
 
-double sunrise(double declination, double elevation, double latitude){
-    return acos(-tan(deg2rad*latitude)*tan(deg2rad*declination))*rotPerHour;
+double sunrise(int julian_date, double declination, double latitude, double longitude){
+    double n = julian_date - 2451545 + 0.0008; //Number of days since Jan 1st 2000 12:00
+    double msn = n - longitude / (deg2rad*360); //Mean Solar Noon
+    double sma = deg2rad * fmod(357.5291 + 0.98560028 * msn,360); //Solar Mean Anomaly
+    double eotc = 1.9148*sin(sma) + 0.02*sin(2*sma) + 0.0003*sin(3*sma); //Equation Of The Center
+    double argument_of_perihelion = 102.9372;
+    double el = deg2rad * fmod(sma + eotc + 180 + argument_of_perihelion,360);
+    double st = 2451545 + msn + 0.0053 * sin(sma) - 0.0069 * sin(2*el);
+    double top = sin(deg2rad*(-0.83))-sin(deg2rad*latitude)*sin(declination);
+    double bot = cos(deg2rad*latitude)*cos(declination);
+    double w = acos(top/bot);
+    return st - w/(deg2rad*360);
+    //return acos(-tan(deg2rad*latitude)*tan(deg2rad*declination))*rotPerHour;
 }
 
 double day_length(double declination, double elevation, double latitude){
     double &d = declination;
+    //probably should add some code to use the correct refraction
     double top = sin(deg2rad*(-0.83-2.076*sqrt(elevation)/60))-(sin(deg2rad*latitude)*sin(d));
     double bot = cos(deg2rad*latitude)*cos(d);
     double w = acos(top/bot);
@@ -152,16 +164,19 @@ double day_length(double declination, double elevation, double latitude){
 int main(int argc, char *argv[]) {
     double elevation = 0.0;
     double latitude = 1.0;
+    double longitude = 1.0;
     int day = DayOfYear();
     CLI::App app;
     app.add_option("--day,-d",day,"specify day N of solar year");
     app.add_option("--elevation,-e",elevation,"specify the elevation of the observer(metres)");
     app.add_option("--latitude,-l",latitude,"specify the latitude of the observer(degrees)");
+    app.add_option("--longitude",longitude,"specify the longitude of the observer(degrees)");
     CLI11_PARSE(app,argc,argv);
     int yesterday = day - 1;
     timed a(day_length(declination_angle(day), elevation, latitude));
     std::cout << a.hours << ":" << (a.minutes < 10 ? "0" : "") << a.minutes << " hours on day " << day << std::endl;
     timed b(day_length(declination_angle(day - 1), elevation, latitude));
+    std::cout << "sunrise: " << sunrise(1,declination_angle(day), latitude, longitude) << std::endl;
     auto c = a-b;
     if (c.real < 0) {
         std::cout << "delta: -" << c.minutes << ":" << (c.seconds < 10 ? "0" : "") << c.seconds;
