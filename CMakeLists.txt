@@ -8,3 +8,5 @@ include_directories(include)
 add_executable(daylight
         include/CLI11.hpp
         src/main.cpp src/time.cpp src/solar.cpp)
+
+install(TARGETS daylight DESTINATION bin)

@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     app.add_option("--day,-d", day, "specify day N of solar year");
     app.add_option("--elevation,-e", elevation, "specify the elevation of the observer(metres)");
     app.add_option("--latitude,-l", latitude, "specify the latitude of the observer(degrees)");
-    app.add_option("--longitude", longitude, "specify the longitude of the observer(degrees)");
+    //app.add_option("--longitude", longitude, "specify the longitude of the observer(degrees)");
     CLI11_PARSE(app, argc, argv);
     int yesterday = day - 1;
     compute_jdn(day);
