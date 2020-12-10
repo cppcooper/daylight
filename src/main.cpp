@@ -58,13 +58,17 @@ int main(int argc, char *argv[]) {
     compute_jdn(day);
     //longitude = 1;
     timed a(day_length(declination_angle(day), elevation, latitude));
-    printf("%d:%02d hours of daylight, (day: %d)\n", a.hours, a.minutes, day);
+    printf("Day: %d\n daylight: %dh %dm %ds\n              ", day, a.hours, a.minutes, a.seconds);
     timed b(day_length(declination_angle(day - 1), elevation, latitude));
     auto c = a - b;
-    printf(" delta: %2d:%02d mins\n", c.real < 0 ? -c.minutes : c.minutes, c.seconds);
+    if(c.real < 0){
+        printf("-%dm %ds from yesterday\n", c.minutes, c.seconds);
+    } else {
+        printf("+%dm %ds from yesterday\n", c.minutes, c.seconds);
+    }
     timed rise(sunrise(day, declination_angle(day), latitude, elevation));
-    printf("sunrise: %d:%02d AM\n", rise.hours, rise.minutes);
+    printf(" sunrise: %2d:%02d AM\n", rise.hours, rise.minutes);
     timed set(sunset(day, declination_angle(day), latitude, elevation));
-    printf("sunrise: %d:%02d PM\n", set.hours-12, set.minutes);
+    printf(" sunset: %3d:%02d PM\n", set.hours-12, set.minutes);
 }
 
