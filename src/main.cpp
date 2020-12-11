@@ -46,25 +46,31 @@ extern int get_cumulative_days(int month, bool isleap = false);
 int main(int argc, char *argv[]) {
     double elevation = 0.0;
     double latitude = 1.0;
-    double longitude = 1.0;
     int day = get_day_of_year();
+
     CLI::App app;
     app.add_option("--day,-d", day, "specify day N of solar year");
     app.add_option("--elevation,-e", elevation, "specify the elevation of the observer(metres)");
     app.add_option("--latitude,-l", latitude, "specify the latitude of the observer(degrees)");
     //app.add_option("--longitude", longitude, "specify the longitude of the observer(degrees)");
     CLI11_PARSE(app, argc, argv);
-    int yesterday = day - 1;
-    compute_jdn(day);
-    //longitude = 1;
-    timed a(day_length(declination_angle(day), elevation, latitude));
-    printf("Day: %d\n daylight: %dh %dm %ds\n              ", day, a.hours, a.minutes, a.seconds);
-    timed b(day_length(declination_angle(day - 1), elevation, latitude));
-    auto c = a - b;
-    if(c.real < 0){
-        printf("-%dm %ds from yesterday\n", c.minutes, c.seconds);
+
+    timed today(day_length(declination_angle(day), elevation, latitude));
+    printf("Day: %d\n daylight: %dh %dm %ds\n", day, today.hours, today.minutes, today.seconds);
+    timed yesterday(day_length(declination_angle(day - 1), elevation, latitude));
+    auto delta = today - yesterday;
+    
+    int whitespace_count = 11 + (today.hours < 10 ? 1 : 2);
+    whitespace_count += delta.minutes < 10 ? 1 : 0;
+    whitespace_count += today.minutes < 10 ? 0 : 1;
+    std::string whitespace;
+    std::fill_n(whitespace.begin(),whitespace_count,' ');
+    printf(whitespace.c_str());
+
+    if(delta.real < 0){
+        printf("-%dm %ds from yesterday\n", delta.minutes, delta.seconds);
     } else {
-        printf("+%dm %ds from yesterday\n", c.minutes, c.seconds);
+        printf("+%dm %ds from yesterday\n", delta.minutes, delta.seconds);
     }
     timed rise(sunrise(day, declination_angle(day), latitude, elevation));
     printf(" sunrise: %2d:%02d AM\n", rise.hours, rise.minutes);
