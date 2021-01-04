@@ -42,6 +42,8 @@ struct timed{
 };
 
 extern int get_cumulative_days(int month, bool isleap = false);
+extern bool is_leap_year(int year);
+extern int get_year();
 
 int main(int argc, char *argv[]) {
     double elevation = 0.0;
@@ -55,26 +57,32 @@ int main(int argc, char *argv[]) {
     //app.add_option("--longitude", longitude, "specify the longitude of the observer(degrees)");
     CLI11_PARSE(app, argc, argv);
 
-    timed today(day_length(declination_angle(day), elevation, latitude));
-    printf("Day: %d\n daylight: %dh %dm %ds\n", day, today.hours, today.minutes, today.seconds);
-    timed yesterday(day_length(declination_angle(day - 1), elevation, latitude));
-    auto delta = today - yesterday;
-    
-    int whitespace_count = 11 + (today.hours < 10 ? 1 : 2);
-    whitespace_count += delta.minutes < 10 ? 1 : 0;
-    whitespace_count += today.minutes < 10 ? 0 : 1;
-    std::string whitespace;
-    std::fill_n(whitespace.begin(),whitespace_count,' ');
-    printf(whitespace.c_str());
 
-    if(delta.real < 0){
-        printf("-%dm %ds from yesterday\n", delta.minutes, delta.seconds);
+    if(day > 0 && day < 366 || (is_leap_year(get_year()) && day == 366)){
+        timed today(day_length(declination_angle(day), elevation, latitude));
+        printf("Day: %d\n daylight: %dh %dm %ds\n", day, today.hours, today.minutes, today.seconds);
+        timed yesterday(day_length(declination_angle(day - 1), elevation, latitude));
+        auto delta = today - yesterday;
+
+        int whitespace_count = 11 + (today.hours < 10 ? 1 : 2);
+        whitespace_count += delta.minutes < 10 ? 1 : 0;
+        whitespace_count += today.minutes < 10 ? 0 : 1;
+        std::string whitespace;
+        std::fill_n(whitespace.begin(),whitespace_count,' ');
+        printf(whitespace.c_str());
+
+        if(delta.real < 0){
+            printf("-%dm %ds from yesterday\n", delta.minutes, delta.seconds);
+        } else {
+            printf("+%dm %ds from yesterday\n", delta.minutes, delta.seconds);
+        }
+        timed rise(sunrise(day, declination_angle(day), latitude, elevation));
+        printf(" sunrise: %2d:%02d AM\n", rise.hours, rise.minutes);
+        timed set(sunset(day, declination_angle(day), latitude, elevation));
+        printf(" sunset: %3d:%02d PM\n", set.hours-12, set.minutes);
     } else {
-        printf("+%dm %ds from yesterday\n", delta.minutes, delta.seconds);
+        std::cerr << "Day is outside of valid range.\n";
+        exit(1);
     }
-    timed rise(sunrise(day, declination_angle(day), latitude, elevation));
-    printf(" sunrise: %2d:%02d AM\n", rise.hours, rise.minutes);
-    timed set(sunset(day, declination_angle(day), latitude, elevation));
-    printf(" sunset: %3d:%02d PM\n", set.hours-12, set.minutes);
 }
 

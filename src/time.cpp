@@ -45,7 +45,7 @@ int get_day_of_year(){
     time_t t;
     time(&t);
     tm* ti=localtime(&t);
-    return ti->tm_yday + (is_leap_year(get_year()) ? 1 : 0);
+    return ti->tm_yday + 1; //jan 1 = day 0
 }
 
 double winter_solstice_offset(){ // for the current solar year
