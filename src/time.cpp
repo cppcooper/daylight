@@ -3,6 +3,8 @@
 //
 #include <iostream>
 #include <ctime>
+#include <cstdlib>
+#include <iomanip>
 #include <cmath>
 
 double convert_dynamical_time_to_day(double val, bool isleap);
@@ -19,9 +21,10 @@ int get_dst(int day_of_year){
     bool isleap = is_leap_year(get_year());
     int month = get_month(day_of_year,isleap);
     int day = day_of_year - get_cumulative_days(month,isleap);
-    std::tm time_in = { 0, 0, 0,day, month, get_year() - 1900 };
+    std::tm time_in = { 0, 0, 0,day, month-1, get_year() - 1900 };
     std::time_t time_temp = std::mktime(&time_in);
     const std::tm * time_out = std::localtime(&time_temp);
+    //std::cout << day << ", " << month << ", " << time_out->tm_isdst << std::endl;
     return time_out->tm_isdst;
 }
 
