@@ -68,8 +68,9 @@ int main(int argc, char *argv[]) {
         whitespace_count += delta.minutes < 10 ? 1 : 0;
         whitespace_count += today.minutes < 10 ? 0 : 1;
         std::string whitespace;
+        whitespace.reserve(whitespace_count+2);
         std::fill_n(whitespace.begin(),whitespace_count,' ');
-        printf(whitespace.c_str());
+        printf("%s", whitespace.c_str());
 
         if(delta.real < 0){
             printf("-%dm %ds from yesterday\n", delta.minutes, delta.seconds);
